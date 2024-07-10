@@ -228,15 +228,15 @@ public class S3ARetryPolicy implements RetryPolicy {
     // throttled requests are can be retried, always
     policyMap.put(AWSServiceThrottledException.class, throttlePolicy);
 
-    // Status 5xx error code is an immediate failure
+    // Status 5xx error code has historically been treated as an immediate failure
     // this is sign of a server-side problem, and while
     // rare in AWS S3, it does happen on third party stores.
     // (out of disk space, etc).
     // by the time we get here, the aws sdk will have
-    // already retried.
+    // already retried, if it is configured to retry exceptions.
     // there is specific handling for some 5XX codes (501, 503);
     // this is for everything else
-    policyMap.put(AWSStatus500Exception.class, fail);
+    policyMap.put(AWSStatus500Exception.class, retryAwsClientExceptions);
 
     // subclass of AWSServiceIOException whose cause is always S3Exception
     policyMap.put(AWSS3IOException.class, retryIdempotentCalls);

@@ -22,12 +22,15 @@ import software.amazon.awssdk.awscore.exception.AwsServiceException;
 
 /**
  * A 5xx response came back from a service.
- * The 500 error considered retriable by the AWS SDK, which will have already
+ * <p>
+ * The 500 error is considered retryable by the AWS SDK, which will have already
  * tried it {@code fs.s3a.attempts.maximum} times before reaching s3a
  * code.
- * How it handles other 5xx errors is unknown: S3A FS code will treat them
- * as unrecoverable on the basis that they indicate some third-party store
- * or gateway problem.
+ * <p>
+ * These are rare, but can occur; they are considered retryable.
+ * Note that HADOOP-19221 shows a failure condition where the
+ * SDK itself did not recover on retry from the error.
+ * Mitigation for the specific failure sequence is now in place.
  */
 public class AWSStatus500Exception extends AWSServiceIOException {
   public AWSStatus500Exception(String operation,
@@ -35,8 +38,4 @@ public class AWSStatus500Exception extends AWSServiceIOException {
     super(operation, cause);
   }
 
-  @Override
-  public boolean retryable() {
-    return false;
-  }
 }

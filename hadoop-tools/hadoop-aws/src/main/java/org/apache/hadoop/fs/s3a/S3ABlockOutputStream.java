@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.s3a;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.time.Duration;
 import java.time.Instant;
@@ -70,6 +71,7 @@ import org.apache.hadoop.util.Progressable;
 import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
 import static org.apache.hadoop.fs.s3a.Statistic.*;
+import static org.apache.hadoop.fs.s3a.impl.HeaderProcessing.CONTENT_TYPE_OCTET_STREAM;
 import static org.apache.hadoop.fs.s3a.impl.ProgressListenerEvent.*;
 import static org.apache.hadoop.fs.s3a.statistics.impl.EmptyS3AStatisticsContext.EMPTY_BLOCK_OUTPUT_STREAM_STATISTICS;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
@@ -79,14 +81,21 @@ import static org.apache.hadoop.io.IOUtils.cleanupWithLogger;
 /**
  * Upload files/parts directly via different buffering mechanisms:
  * including memory and disk.
- *
- * If the stream is closed and no update has started, then the upload
- * is instead done as a single PUT operation.
- *
- * Unstable: statistics and error handling might evolve.
- *
+ * <p>
+ * The upload will not be completed until {@link #close()}, and
+ * then only if {@link PutTracker#outputImmediatelyVisible()} is true.
+ * <p>
+ * If less than a single block of data has been written before {@code close()}
+ * then it will uploaded as a single PUT (non-magic files), otherwise
+ * (larger files, magic files) a multipart upload is initiated and blocks
+ * uploaded as the data accrued reaches the block size.
+ * <p>
+ * The {@code close()} call blocks until all uploads have been completed.
+ * This may be a slow operation: progress callbacks are made during this
+ * process to reduce the risk of timeouts.
+ * <p>
  * Syncable is declared as supported so the calls can be
- * explicitly rejected.
+ * explicitly rejected if the filesystem is configured to do so.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -596,17 +605,11 @@ class S3ABlockOutputStream extends OutputStream implements
     final S3ADataBlocks.DataBlock block = getActiveBlock();
     long size = block.dataSize();
     final S3ADataBlocks.BlockUploadData uploadData = block.startUpload();
-    final PutObjectRequest putObjectRequest = uploadData.hasFile() ?
+    final PutObjectRequest putObjectRequest =
         writeOperationHelper.createPutObjectRequest(
             key,
-            uploadData.getFile().length(),
-            builder.putOptions,
-            true)
-        : writeOperationHelper.createPutObjectRequest(
-            key,
-            size,
-            builder.putOptions,
-        false);
+            uploadData.getSize(),
+            builder.putOptions);
 
     BlockUploadProgress progressCallback =
         new BlockUploadProgress(block, progressListener, now());
@@ -618,7 +621,7 @@ class S3ABlockOutputStream extends OutputStream implements
             // stream afterwards.
             PutObjectResponse response =
                 writeOperationHelper.putObject(putObjectRequest, builder.putOptions, uploadData,
-                    uploadData.hasFile(), statistics);
+                    statistics);
             progressCallback.progressChanged(REQUEST_BYTE_TRANSFER_EVENT);
             return response;
           } finally {
@@ -872,9 +875,10 @@ class S3ABlockOutputStream extends OutputStream implements
       final RequestBody requestBody;
       try {
         uploadData = block.startUpload();
-        requestBody = uploadData.hasFile()
-            ? RequestBody.fromFile(uploadData.getFile())
-            : RequestBody.fromInputStream(uploadData.getUploadStream(), size);
+        requestBody = RequestBody.fromContentProvider(
+            uploadData.getContentProvider(),
+            uploadData.getSize(),
+            CONTENT_TYPE_OCTET_STREAM);
 
         request = writeOperationHelper.newUploadPartRequestBuilder(
             key,
@@ -927,7 +931,9 @@ class S3ABlockOutputStream extends OutputStream implements
               throw e;
             } finally {
               // close the stream and block
-              cleanupWithLogger(LOG, uploadData, block);
+              LOG.debug("closing block");
+              cleanupWithLogger(LOG, uploadData);
+              cleanupWithLogger(LOG, block);
             }
           });
       partETagsFutures.add(partETagFuture);
@@ -935,7 +941,7 @@ class S3ABlockOutputStream extends OutputStream implements
 
     /**
      * Block awaiting all outstanding uploads to complete.
-     * @return list of results
+     * @return list of results or null if interrupted.
      * @throws IOException IO Problems
      */
     private List<CompletedPart> waitForAllPartUploads() throws IOException {
@@ -943,12 +949,14 @@ class S3ABlockOutputStream extends OutputStream implements
       try {
         return Futures.allAsList(partETagsFutures).get();
       } catch (InterruptedException ie) {
-        LOG.warn("Interrupted partUpload", ie);
-        Thread.currentThread().interrupt();
-        return null;
+        // interruptions are raided if a task is aborted by spark.
+        LOG.warn("Interrupted while waiting for uploads to {} to complete", key, ie);
+        // abort the upload
+        abort();
+        // then regenerate a new InterruptedIOException
+        throw (IOException) new InterruptedIOException(ie.toString()).initCause(ie);
       } catch (ExecutionException ee) {
         //there is no way of recovering so abort
-        //cancel all partUploads
         LOG.debug("While waiting for upload completion", ee);
         //abort multipartupload
         this.abort();
