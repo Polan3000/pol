@@ -876,11 +876,13 @@ class S3ABlockOutputStream extends OutputStream implements
             ? RequestBody.fromFile(uploadData.getFile())
             : RequestBody.fromInputStream(uploadData.getUploadStream(), size);
 
-        request = writeOperationHelper.newUploadPartRequestBuilder(
+        UploadPartRequest.Builder requestBuilder = writeOperationHelper.newUploadPartRequestBuilder(
             key,
             uploadId,
             currentPartNumber,
-            size).build();
+            isLast,
+            size);
+        request = requestBuilder.build();
       } catch (SdkException aws) {
         // catch and translate
         IOException e = translateException("upload", key, aws);

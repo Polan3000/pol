@@ -737,6 +737,65 @@ public final class Constants {
       "fs.s3a.encryption.key";
 
   /**
+   * Custom keyring class name for CSE-KMS.
+   * value:{@value}
+   */
+  public static final String S3_ENCRYPTION_CSE_CUSTOM_KEYRING_CLASS_NAME =
+          "fs.s3a.encryption.cse.custom.keyring.class.name";
+
+  /**
+   * Config to support reading unencrypted s3 objects when CSE is enabled.
+   * This is to provide backward compatibility with V1/V2 client.
+   * value:{@value}
+   */
+  public static final String S3_ENCRYPTION_CSE_READ_UNENCRYPTED_OBJECTS =
+          "fs.s3a.encryption.cse.read.unencrypted.objects";
+
+  /**
+   * Default value : {@value}.
+   */
+  public static final boolean S3_ENCRYPTION_CSE_READ_UNENCRYPTED_OBJECTS_DEFAULT = false;
+
+  /**
+   * Config to calculate the size of unencrypted object size using ranged S3 calls.
+   * This is to provide backward compatability with objects encrypted with V1 client.
+   * Unlike V2 and V3 client which always pads 16 bytes, V1 client pads bytes till the
+   * object size reaches next multiple of 16.
+   * This is to provide backward compatibility with V1 client.
+   * value:{@value}
+   */
+  public static final String S3_ENCRYPTION_CSE_OBJECT_SIZE_FROM_RANGED_GET_ENABLED =
+          "fs.s3a.encryption.cse.object.size.ranged.get.enabled";
+
+  /**
+   * Default value : {@value}.
+   */
+  public static final boolean S3_ENCRYPTION_CSE_OBJECT_SIZE_FROM_RANGED_GET_ENABLED_DEFAULT = false;
+
+  /**
+   * Config to skip file named with suffix
+   * {@link #S3_ENCRYPTION_CSE_INSTRUCTION_FILE_SUFFIX}. V1/V2 client supports storing encryption
+   * metadata in an instruction file which should be skipped while listing for the files.
+   * This is to provide backward compatibility with V1/V2 client.
+   * value:{@value}
+   */
+  public static final String S3_ENCRYPTION_CSE_SKIP_INSTRUCTION_FILE =
+      "fs.s3a.encryption.cse.skip.instruction.file";
+
+  /**
+   * Default value : {@value}.
+   */
+  public static final boolean S3_ENCRYPTION_CSE_SKIP_INSTRUCTION_FILE_DEFAULT = false;
+
+  /**
+   * Suffix of instruction file : {@value}.
+   */
+  public static final String S3_ENCRYPTION_CSE_INSTRUCTION_FILE_SUFFIX = ".instruction";
+
+
+
+
+  /**
    * List of custom Signers. The signer class will be loaded, and the signer
    * name will be associated with this signer class in the S3 SDK.
    * Examples

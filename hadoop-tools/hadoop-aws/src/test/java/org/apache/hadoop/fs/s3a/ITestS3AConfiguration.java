@@ -370,6 +370,7 @@ public class ITestS3AConfiguration {
 
     conf = new Configuration();
     skipIfCrossRegionClient(conf);
+    unsetEncryption(conf);
     conf.set(Constants.PATH_STYLE_ACCESS, Boolean.toString(true));
     assertTrue(conf.getBoolean(Constants.PATH_STYLE_ACCESS, false));
 
@@ -411,6 +412,7 @@ public class ITestS3AConfiguration {
   public void testDefaultUserAgent() throws Exception {
     conf = new Configuration();
     skipIfCrossRegionClient(conf);
+    unsetEncryption(conf);
     fs = S3ATestUtils.createTestFileSystem(conf);
     assertNotNull(fs);
     S3Client s3 = getS3Client("User Agent");
@@ -425,6 +427,7 @@ public class ITestS3AConfiguration {
   public void testCustomUserAgent() throws Exception {
     conf = new Configuration();
     skipIfCrossRegionClient(conf);
+    unsetEncryption(conf);
     conf.set(Constants.USER_AGENT_PREFIX, "MyApp");
     fs = S3ATestUtils.createTestFileSystem(conf);
     assertNotNull(fs);
@@ -636,5 +639,16 @@ public class ITestS3AConfiguration {
         && configuration.get(AWS_REGION, null) == null) {
       skip("Skipping test as cross region client is in use ");
     }
+  }
+
+  /**
+   * Unset  encryption options.
+   * This is needed to avoid encryption tests interfering with non-encryption
+   * tests.
+   * @param conf Configuations
+   */
+  private static void unsetEncryption(Configuration conf) {
+    removeBaseAndBucketOverrides(conf, S3_ENCRYPTION_ALGORITHM);
+    conf.set(Constants.S3_ENCRYPTION_ALGORITHM, S3AEncryptionMethods.NONE.getMethod());
   }
 }

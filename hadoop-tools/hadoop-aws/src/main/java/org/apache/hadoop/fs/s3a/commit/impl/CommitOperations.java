@@ -580,14 +580,16 @@ public class CommitOperations extends AbstractStoreOperation
         for (int partNumber = 1; partNumber <= numParts; partNumber += 1) {
           progress.progress();
           long size = Math.min(length - offset, uploadPartSize);
-          UploadPartRequest part = writeOperations.newUploadPartRequestBuilder(
+          UploadPartRequest.Builder partBuilder = writeOperations.newUploadPartRequestBuilder(
               destKey,
               uploadId,
               partNumber,
-              size).build();
+              partNumber == numParts,
+              size);
           // Read from the file input stream at current position.
           RequestBody body = RequestBody.fromInputStream(fileStream, size);
-          UploadPartResponse response = writeOperations.uploadPart(part, body, statistics);
+          UploadPartResponse response = writeOperations.uploadPart(partBuilder.build(),
+              body, statistics);
           offset += uploadPartSize;
           parts.add(CompletedPart.builder()
               .partNumber(partNumber)

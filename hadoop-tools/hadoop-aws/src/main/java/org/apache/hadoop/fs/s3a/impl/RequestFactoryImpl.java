@@ -43,6 +43,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.MetadataDirective;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.SdkPartType;
 import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
 import software.amazon.awssdk.services.s3.model.StorageClass;
 import software.amazon.awssdk.services.s3.model.UploadPartRequest;
@@ -559,6 +560,7 @@ public class RequestFactoryImpl implements RequestFactory {
       String destKey,
       String uploadId,
       int partNumber,
+      boolean isLastPart,
       long size) throws PathIOException {
     checkNotNull(uploadId);
     checkArgument(size >= 0, "Invalid partition size %s", size);
@@ -580,6 +582,9 @@ public class RequestFactoryImpl implements RequestFactory {
         .uploadId(uploadId)
         .partNumber(partNumber)
         .contentLength(size);
+    if (isLastPart) {
+      builder.sdkPartType(SdkPartType.LAST);
+    }
     uploadPartEncryptionParameters(builder);
     return prepareRequest(builder);
   }

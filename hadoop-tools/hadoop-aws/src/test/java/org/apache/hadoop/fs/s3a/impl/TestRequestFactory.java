@@ -196,11 +196,13 @@ public class TestRequestFactory extends AbstractHadoopTestBase {
     String path = "path";
     String id = "1";
 
-    a(factory.newUploadPartRequestBuilder(path, id, 1, 0));
-    a(factory.newUploadPartRequestBuilder(path, id, 2, 128_000_000));
+    a(factory.newUploadPartRequestBuilder(path, id, 1, false, 0));
+    a(factory.newUploadPartRequestBuilder(path, id, 2, false,
+        128_000_000));
     // partNumber is past the limit
     intercept(PathIOException.class, () ->
-        factory.newUploadPartRequestBuilder(path, id, 3, 128_000_000));
+        factory.newUploadPartRequestBuilder(path, id, 3, true,
+            128_000_000));
 
     assertThat(countRequests.counter.get())
         .describedAs("request preparation count")
