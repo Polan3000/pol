@@ -24,6 +24,7 @@ import com.fasterxml.jackson.core.JsonFactoryBuilder;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.hadoop.util.JacksonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.commons.math3.distribution.AbstractRealDistribution;
@@ -88,7 +89,8 @@ public class SynthTraceJobProducer implements JobStoryProducer {
 
     JsonFactoryBuilder jsonFactoryBuilder = new JsonFactoryBuilder();
     jsonFactoryBuilder.configure(JsonFactory.Feature.INTERN_FIELD_NAMES, true);
-    ObjectMapper mapper = new ObjectMapper(jsonFactoryBuilder.build());
+
+    ObjectMapper mapper = JacksonUtil.createObjectMapper(jsonFactoryBuilder.build());
     mapper.configure(FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     FileSystem ifs = path.getFileSystem(conf);
