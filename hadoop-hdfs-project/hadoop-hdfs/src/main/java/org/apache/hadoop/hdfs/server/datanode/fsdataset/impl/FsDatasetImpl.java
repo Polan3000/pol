@@ -3868,20 +3868,15 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   @Override
   public void hardLinkOneBlock(ExtendedBlock srcBlock, ExtendedBlock dstBlock) throws IOException {
     BlockLocalPathInfo blpi = getBlockLocalPathInfo(srcBlock);
-    File src = new File(blpi.getBlockPath());
-    File srcMeta = new File(blpi.getMetaPath());
-
     FsVolumeImpl v = getVolume(srcBlock);
-
-    if (v.getAvailable() < dstBlock.getNumBytes()) {
-      throw new DiskOutOfSpaceException("Insufficient space for hardlink block " + srcBlock);
-    }
-
-    BlockPoolSlice dstBPS = v.getBlockPoolSlice(dstBlock.getBlockPoolId());
-    File dstBlockFile = dstBPS.hardLinkOneBlock(src, srcMeta, dstBlock.getLocalBlock());
 
     try (AutoCloseableLock lock = lockManager.writeLock(LockLevel.VOLUME, dstBlock.getBlockPoolId(),
         v.getStorageID())) {
+      File src = new File(blpi.getBlockPath());
+      File srcMeta = new File(blpi.getMetaPath());
+      BlockPoolSlice dstBPS = v.getBlockPoolSlice(dstBlock.getBlockPoolId());
+      File dstBlockFile = dstBPS.hardLinkOneBlock(src, srcMeta, dstBlock.getLocalBlock());
+
       ReplicaInfo replicaInfo =
           new LocalReplicaInPipeline(dstBlock.getBlockId(), dstBlock.getGenerationStamp(), v,
               dstBlockFile.getParentFile(), dstBlock.getLocalBlock().getNumBytes());

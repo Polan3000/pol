@@ -497,7 +497,7 @@ public class ExternalDatasetImpl implements FsDatasetSpi<ExternalVolumeImpl> {
   @Override
   public void hardLinkOneBlock(ExtendedBlock srcBlock, ExtendedBlock dstBlock)
       throws IOException {
-
+    throw new UnsupportedOperationException();
   }
 
 }
