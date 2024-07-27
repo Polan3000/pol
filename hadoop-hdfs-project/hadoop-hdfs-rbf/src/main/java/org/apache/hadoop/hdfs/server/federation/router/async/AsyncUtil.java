@@ -80,11 +80,14 @@ public final class AsyncUtil {
     if (clazz == null) {
       return null;
     }
-    if (clazz.equals(Boolean.class)) {
+    if (clazz.equals(Boolean.class)
+        || clazz.equals(boolean.class)) {
       return (R) BOOLEAN_RESULT;
-    } else if (clazz.equals(Long.class)) {
+    } else if (clazz.equals(Long.class)
+        || clazz.equals(long.class)) {
       return (R) LONG_RESULT;
-    } else if (clazz.equals(Integer.class)) {
+    } else if (clazz.equals(Integer.class)
+        || clazz.equals(int.class)) {
       return (R) INT_RESULT;
     }
     return (R) NULL_RESULT;

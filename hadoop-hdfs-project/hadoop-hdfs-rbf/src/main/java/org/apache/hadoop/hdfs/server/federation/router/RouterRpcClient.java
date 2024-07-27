@@ -400,7 +400,7 @@ public class RouterRpcClient {
    *         NN + current user.
    * @throws IOException If we cannot get a connection to the NameNode.
    */
-  private ConnectionContext getConnection(UserGroupInformation ugi, String nsId,
+  protected ConnectionContext getConnection(UserGroupInformation ugi, String nsId,
       String rpcAddress, Class<?> proto) throws IOException {
     ConnectionContext connection = null;
     try {
@@ -462,7 +462,7 @@ public class RouterRpcClient {
    * @return Retry decision.
    * @throws IOException An IO Error occurred.
    */
-  private RetryDecision shouldRetry(
+  protected RetryDecision shouldRetry(
       final IOException ioe, final int retryCount, final String nsId,
       final FederationNamenodeContext namenode,
       final boolean listObserverFirst) throws IOException {
@@ -665,7 +665,7 @@ public class RouterRpcClient {
    * in the caller context, removing the old values if they were
    * already present.
    */
-  private void addClientInfoToCallerContext(UserGroupInformation ugi) {
+  protected void addClientInfoToCallerContext(UserGroupInformation ugi) {
     CallerContext ctx = CallerContext.getCurrent();
     String origContext = ctx == null ? null : ctx.getContext();
     byte[] origSignature = ctx == null ? null : ctx.getSignature();
@@ -817,7 +817,7 @@ public class RouterRpcClient {
    * @param ioe Exception to clean up.
    * @return Copy of the original exception with a clean message.
    */
-  private static IOException getCleanException(IOException ioe) {
+  protected static IOException getCleanException(IOException ioe) {
     IOException ret = null;
 
     String msg = ioe.getMessage();
@@ -1185,7 +1185,7 @@ public class RouterRpcClient {
    * @param loc Location we are processing.
    * @return Exception processed for federation.
    */
-  private IOException processException(
+  protected IOException processException(
       IOException ioe, RemoteLocationContext loc) {
 
     if (ioe instanceof RemoteException) {
@@ -1251,7 +1251,7 @@ public class RouterRpcClient {
    * @return True if the result is an instance of the required class or if the
    *         expected class is null.
    */
-  private static boolean isExpectedClass(Class<?> expectedClass, Object clazz) {
+  protected static boolean isExpectedClass(Class<?> expectedClass, Object clazz) {
     if (expectedClass == null) {
       return true;
     } else if (clazz == null) {
@@ -1269,7 +1269,7 @@ public class RouterRpcClient {
    * @return True if the result is equals to the expected value or if the
    *         expected value is null.
    */
-  private static boolean isExpectedValue(Object expectedValue, Object value) {
+  protected static boolean isExpectedValue(Object expectedValue, Object value) {
     if (expectedValue == null) {
       return true;
     } else if (value == null) {
@@ -1624,7 +1624,7 @@ public class RouterRpcClient {
    * @param originContext origin CallerContext which should be transferred
    *                      to server side.
    */
-  private void transferThreadLocalContext(
+  protected void transferThreadLocalContext(
       final Call originCall, final CallerContext originContext) {
     Server.getCurCall().set(originCall);
     CallerContext.setCurrent(originContext);
@@ -1675,7 +1675,7 @@ public class RouterRpcClient {
    * @param controller fairness policy controller to acquire permit from
    * @throws IOException If permit could not be acquired for the nsId.
    */
-  private void acquirePermit(final String nsId, final UserGroupInformation ugi,
+  protected void acquirePermit(final String nsId, final UserGroupInformation ugi,
       final RemoteMethod m, RouterRpcFairnessPolicyController controller)
       throws IOException {
     if (controller != null) {
@@ -1708,7 +1708,7 @@ public class RouterRpcClient {
    * @param m Remote method that needs to be invoked.
    * @param controller fairness policy controller to release permit from
    */
-  private void releasePermit(final String nsId, final UserGroupInformation ugi,
+  protected void releasePermit(final String nsId, final UserGroupInformation ugi,
       final RemoteMethod m, RouterRpcFairnessPolicyController controller) {
     if (controller != null) {
       controller.releasePermit(nsId);
@@ -1782,7 +1782,7 @@ public class RouterRpcClient {
    * @return A prioritized list of NNs to use for communication.
    * @throws IOException If a NN cannot be located for the nameservice ID.
    */
-  private List<? extends FederationNamenodeContext> getOrderedNamenodes(String nsId,
+  protected List<? extends FederationNamenodeContext> getOrderedNamenodes(String nsId,
       boolean isObserverRead) throws IOException {
     final List<? extends FederationNamenodeContext> namenodes;
 
@@ -1802,7 +1802,7 @@ public class RouterRpcClient {
     return namenodes;
   }
 
-  private boolean isObserverReadEligible(String nsId, Method method) {
+  protected boolean isObserverReadEligible(String nsId, Method method) {
     return isReadCall(method) && isNamespaceObserverReadEligible(nsId);
   }
 
@@ -1857,7 +1857,7 @@ public class RouterRpcClient {
    * {@link RouterRpcClient#isUnavailableException(IOException) unavailable exception},
    * otherwise false.
    */
-  private boolean shouldRotateCache(IOException ioe) {
+  protected boolean shouldRotateCache(IOException ioe) {
     if (isUnavailableException(ioe)) {
       return true;
     }

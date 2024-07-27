@@ -18,12 +18,12 @@
 
 package org.apache.hadoop.hdfs.protocolPB;
 
+import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
+import org.apache.hadoop.hdfs.server.federation.router.ThreadLocalContext;
 import org.apache.hadoop.hdfs.server.federation.router.async.ApplyFunction;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine2;
-import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.internal.ShadedProtobufHelper;
 import org.apache.hadoop.util.concurrent.AsyncGet;
 import org.slf4j.Logger;
@@ -33,7 +33,6 @@ import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
 import static org.apache.hadoop.hdfs.server.federation.router.async.Async.warpCompletionException;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncApply;
 import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncCompleteWith;
 import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncReturn;
 import static org.apache.hadoop.ipc.internal.ShadedProtobufHelper.ipc;
@@ -50,20 +49,22 @@ public final class AsyncRpcProtocolPBUtil {
     AsyncGet<T, Exception> asyncReqMessage =
         (AsyncGet<T, Exception>) ProtobufRpcEngine2.getAsyncReturnMessage();
     CompletableFuture<Writable> responseFuture = Client.getResponseFuture();
-    // transfer originCall & callerContext to worker threads of executor.
-    final Server.Call originCall = Server.getCurCall().get();
-    final CallerContext originContext = CallerContext.getCurrent();
-    asyncCompleteWith(responseFuture);
-    asyncApply(o -> {
-      try {
-        Server.getCurCall().set(originCall);
-        CallerContext.setCurrent(originContext);
-        T res = asyncReqMessage.get(-1, null);
-        return response.apply(res);
-      } catch (Exception e) {
+    ThreadLocalContext threadLocalContext = new ThreadLocalContext();
+    asyncCompleteWith(responseFuture.handleAsync((writable, e) -> {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("async ipc response {} {}, {} ", call, writable, threadLocalContext);
+      }
+      threadLocalContext.transfer();
+      if (e != null) {
         throw warpCompletionException(e);
       }
-    });
+      try {
+        T res = asyncReqMessage.get(-1, null);
+        return response.apply(res);
+      } catch (Exception ex) {
+        throw warpCompletionException(ex);
+      }
+    }, RouterRpcServer.getAsyncRouterResponse()));
     return asyncReturn(clazz);
   }
 }
