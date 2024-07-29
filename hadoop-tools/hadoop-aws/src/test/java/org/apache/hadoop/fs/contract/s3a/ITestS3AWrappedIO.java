@@ -16,38 +16,20 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.util.functional;
+package org.apache.hadoop.fs.contract.s3a;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.contract.AbstractFSContract;
+import org.apache.hadoop.io.wrappedio.impl.TestWrappedIO;
 
 /**
- * Function of arity 1 which may raise an IOException.
- * @param <T> type of arg1
- * @param <R> type of return value.
+ * Test S3A access through the wrapped operations class.
  */
-@FunctionalInterface
-public interface FunctionRaisingIOE<T, R> {
+public class ITestS3AWrappedIO extends TestWrappedIO {
 
-  /**
-   * Apply the function.
-   * @param t argument 1
-   * @return result
-   * @throws IOException Any IO failure
-   */
-  R apply(T t) throws IOException;
-
-  /**
-   * Apply unchecked.
-   * @param t argument
-   * @return the evaluated function
-   * @throws UncheckedIOException IOE raised.
-   */
-  default R unchecked(T t) {
-    try {
-      return apply(t);
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
+  @Override
+  protected AbstractFSContract createContract(Configuration conf) {
+    return new S3AContract(conf);
   }
+
 }

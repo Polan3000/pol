@@ -77,7 +77,7 @@ new `optLong()`, `optDouble()`, `mustLong()` and `mustDouble()` builder methods.
 ## Invariants
 
 The `FutureDataInputStreamBuilder` interface does not require parameters or
-or the state of `FileSystem` until [`build()`](#build) is
+or the state of `FileSystem` until `build()` is
 invoked and/or during the asynchronous open operation itself.
 
 Some aspects of the state of the filesystem, MAY be checked in the initial
@@ -377,14 +377,20 @@ performance -and vice versa.
    subsystems.
 1. If a policy is not recognized, the filesystem client MUST ignore it.
 
-| Policy       | Meaning                                                  |
-|--------------|----------------------------------------------------------|
-| `adaptive`   | Any adaptive policy implemented by the store.            |
-| `default`    | The default policy for this store. Generally "adaptive". |
-| `random`     | Optimize for random access.                              |
-| `sequential` | Optimize for sequential access.                          |
-| `vector`     | The Vectored IO API is intended to be used.              |
-| `whole-file` | The whole file will be read.                             |
+| Policy       | Meaning                                                                |
+|--------------|------------------------------------------------------------------------|
+| `adaptive`   | Any adaptive policy implemented by the store.                          |
+| `avro`       | This is an avro format which will be read sequentially                 |
+| `csv`        | This is CSV data which will be read sequentially                       |
+| `json`       | This is a UTF-8 JSON/JSON lines format which will be read sequentially |
+| `default`    | The default policy for this store. Generally "adaptive".               |
+| `columnar`   | This is any columnar format other than ORC/parquet.                    |
+| `orc`        | This is an ORC file. Optimize for it.                                  |
+| `parquet`    | This is a Parquet file. Optimize for it.                               |
+| `random`     | Optimize for random access.                                            |
+| `sequential` | Optimize for sequential access.                                        |
+| `vector`     | The Vectored IO API is intended to be used.                            |
+| `whole-file` | The whole file will be read.                                           |
 
 Choosing the wrong read policy for an input source may be inefficient.
 
@@ -425,7 +431,7 @@ sequential to random seek policies may be exensive.
 When applications explicitly set the `fs.option.openfile.read.policy` option, if
 they know their read plan, they SHOULD declare which policy is most appropriate.
 
-#### <a name="read.policy.default"></a> Read Policy ``
+#### <a name="read.policy.default"></a> Read Policy `default`
 
 The default policy for the filesystem instance.
 Implementation/installation-specific.
@@ -473,7 +479,39 @@ Strategies can include:
 Applications which know that the entire file is to be read from an opened stream SHOULD declare this
 read policy.
 
-### <a name="openfile.length"></a> Option: `fs.option.openfile.length`
+
+#### <a name="read.policy.columnar"></a> Read Policy `columnar`
+
+Declare that the data is some (unspecific) columnar format and that read sequencies
+should be expected to be random IO of whole column stripes/rowgroups, possibly fetching associated
+column statistics first, to determine whether a scan of a stripe/rowgroup can
+be skipped entirely.
+
+#### <a name="read.policy.fileformat.parquet"></a> File Format Read Policies `parquet`, and `orc`
+
+These are read policies which declare that the file is of a specific columnar format
+and that the input stream MAY be optimized for reading from these.
+
+In particular
+* File footers may be fetched and cached.
+* Vector IO and random IO SHOULD be expected.
+
+These read policies are a Hadoop 3.4.x addition, so applications and
+libraries targeting multiple versions, SHOULD list their fallback
+policies if these are not recognized, e.g. request a policy such as `parquet, vector, random`.
+
+
+#### <a name="read.policy.fileformat.sequential"></a> File format Read Policies `avro`, `json` and `csv`
+
+These are read policies which declare that the file is of a specific sequential format
+and that the input stream MAY be optimized for reading from these.
+
+These read policies are a Hadoop 3.4.x addition, so applications and
+libraries targeting multiple versions, SHOULD list their fallback
+policies if these are not recognized, e.g. request a policy such as `avro, sequential`.
+
+
+### <a name="openfile.length"></a> Option: `fs.option.openfile.length`: `Long`
 
 Declare the length of a file.
 
@@ -499,7 +537,7 @@ If this option is used by the FileSystem implementation
 * If a file status is supplied along with a value in `fs.opt.openfile.length`;
   the file status values take precedence.
 
-### <a name="split.start"></a> Options: `fs.option.openfile.split.start` and `fs.option.openfile.split.end`
+### <a name="split.start"></a> Options: `fs.option.openfile.split.start` and `fs.option.openfile.split.end`: `Long`
 
 Declare the start and end of the split when a file has been split for processing
 in pieces.
@@ -527,6 +565,21 @@ split.
 Therefore clients MUST be allowed to `seek()`/`read()` past the length
 set in `fs.option.openfile.split.end` if the file is actually longer
 than that value.
+
+### <a name="footer.cache"></a> Option: `fs.option.openfile.footer.cache`: `Boolean`
+
+Should a footer be cached?
+
+* This is a hint for clients which cache footers.
+* If a format with known footers are is declared in the read policy, the
+  default footer cache policy of that file type SHALL be used.
+
+This option allows for that default policy to be overridden.
+This is recommended if an application wishes to explicitly declare that Parquet/ORC files
+are being read -but does not want or need the filesystem stream to cache any footer
+because the application itself does such caching.
+Duplicating footer caching is inefficient and if there is memory/memory cache conflict,
+potentially counter-efficient.
 
 ## <a name="s3a"></a> S3A-specific options
 
