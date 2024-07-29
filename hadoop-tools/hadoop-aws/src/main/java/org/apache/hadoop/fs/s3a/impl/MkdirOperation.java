@@ -26,6 +26,8 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
@@ -54,6 +56,8 @@ import org.apache.hadoop.fs.s3a.S3AFileStatus;
  *   <li>If needed, one PUT</li>
  * </ol>
  */
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
 public class MkdirOperation extends ExecutingStoreOperation<Boolean> {
 
   private static final Logger LOG = LoggerFactory.getLogger(
@@ -63,21 +67,31 @@ public class MkdirOperation extends ExecutingStoreOperation<Boolean> {
 
   private final MkdirCallbacks callbacks;
 
-  /**
-   * Should checks for ancestors existing be skipped?
-   * This flag is set when working with magic directories.
-   */
+  private final boolean performanceCreation;
+
   private final boolean isMagicPath;
 
+  /**
+   * Initialize Mkdir Operation context for S3A.
+   *
+   * @param storeContext Store context.
+   * @param dir Dir path of the directory.
+   * @param callbacks MkdirCallbacks object used by the Mkdir operation.
+   * @param isMagicPath True if the path is magic commit path.
+   * @param performanceCreation If true, skip validation of the parent directory
+   * structure.
+   */
   public MkdirOperation(
       final StoreContext storeContext,
       final Path dir,
       final MkdirCallbacks callbacks,
-      final boolean isMagicPath) {
+      final boolean isMagicPath,
+      final boolean performanceCreation) {
     super(storeContext);
     this.dir = dir;
     this.callbacks = callbacks;
     this.isMagicPath = isMagicPath;
+    this.performanceCreation = performanceCreation;
   }
 
   /**
@@ -124,7 +138,32 @@ public class MkdirOperation extends ExecutingStoreOperation<Boolean> {
       return true;
     }
 
-    // Walk path to root, ensuring closest ancestor is a directory, not file
+    // if performance creation mode is set, no need to check
+    // whether the closest ancestor is dir.
+    if (!performanceCreation) {
+      verifyFileStatusOfClosestAncestor();
+    }
+
+    // if we get here there is no directory at the destination.
+    // so create one.
+
+    // Create the marker file, delete the parent entries
+    // if the filesystem isn't configured to retain them
+    callbacks.createFakeDirectory(dir, false);
+    return true;
+  }
+
+  /**
+   * Verify the file status of the closest ancestor, if it is
+   * dir, the mkdir operation should proceed. If it is file,
+   * the mkdir operation should throw error.
+   *
+   * @throws IOException If either file status could not be retrieved,
+   * or if the closest ancestor is a file.
+   */
+  private void verifyFileStatusOfClosestAncestor() throws IOException {
+    FileStatus fileStatus;
+    // Walk path to root, ensuring the closest ancestor is a directory, not file
     Path fPart = dir.getParent();
     try {
       while (fPart != null && !fPart.isRoot()) {
@@ -140,24 +179,18 @@ public class MkdirOperation extends ExecutingStoreOperation<Boolean> {
         }
 
         // there's a file at the parent entry
-        throw new FileAlreadyExistsException(String.format(
-            "Can't make directory for path '%s' since it is a file.",
-            fPart));
+        throw new FileAlreadyExistsException(
+            String.format(
+                "Can't make directory for path '%s' since it is a file.",
+                fPart));
       }
     } catch (AccessDeniedException e) {
       LOG.info("mkdirs({}}: Access denied when looking"
               + " for parent directory {}; skipping checks",
-          dir, fPart);
+          dir,
+          fPart);
       LOG.debug("{}", e, e);
     }
-
-    // if we get here there is no directory at the destination.
-    // so create one.
-
-    // Create the marker file, delete the parent entries
-    // if the filesystem isn't configured to retain them
-    callbacks.createFakeDirectory(dir, false);
-    return true;
   }
 
   /**
